@@ -332,7 +332,6 @@ Example: Oppa, did you eat yet? Lee Se Ra is waiting." class="flex-1 w-full resi
           const prefix = line.slice(0, splitPos);
           const rawText = line.slice(splitPos);
           const isDrawing = /\\p[1-9]/.test(rawText);
-          // חילוץ תגיות פתיחה וניקוי תגיות לקבלת טקסט נקי לתרגום
           const leadingMatch = rawText.match(/^(\{[^}]*\})+/);
           const leadingTags = leadingMatch ? leadingMatch[0] : '';
           const plainSource = isDrawing ? '' : rawText.replace(/\{[^}]*\}/g, '').replace(/\\[Nnh]/g, '\n').trim();
@@ -356,8 +355,8 @@ Example: Oppa, did you eat yet? Lee Se Ra is waiting." class="flex-1 w-full resi
 
     // --- תיקון פיסוק אוטומטי ל-Aegisub (RTL Unicode Wrapping + Encoding 177) ---
     function fixHebrewRtlForAegisub(text, newlineSeparator = '\\N') {
-      const RLE = '\u202B'; // Right-to-Left Embedding
-      const PDF = '\u202C'; // Pop Directional Formatting
+      const RLE = '\u202B';
+      const PDF = '\u202C';
       return text
         .split(newlineSeparator)
         .map(line => {
@@ -408,7 +407,7 @@ Example: Oppa, did you eat yet? Lee Se Ra is waiting." class="flex-1 w-full resi
       return (str || '').replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>');
     }
 
-    // --- מנוע התרגום מול Gemini AI ---
+    // --- מנוע התרגום מול Gemini AI (מעודכן ל-gemini-3.8-flash) ---
     async function callGeminiBatch(lines) {
       const glossaryText = glossary.length
         ? `\nMANDATORY GLOSSARY:\n${glossary.map(g => `- "${g.source}" => "${g.target}"`).join('\n')}`
@@ -418,11 +417,11 @@ Example: Oppa, did you eat yet? Lee Se Ra is waiting." class="flex-1 w-full resi
 RULES:
 1. Preserve ambiguity! Never guess gender or singular/plural if unclear. Use gender-neutral Hebrew or provide a short note in "note".
 2. Korean Names: Family name FIRST, NO hyphens in given name (e.g. "Kim Ji Young" -> "קים ג'י יונג", "Lee Se Ra" -> "יי סרה").
-3. Translate Asian terms (Oppa, Hyung, Unnie, Noona, Sunbae, Aish, Daebak, Fighting) contextually into natural Hebrew.
+3. Translate Asian terms contextually into natural Hebrew.
 4. Keep line breaks (\\n) and punctuation accurate.${glossaryText}
 Return ONLY valid JSON: { "items": [ { "id": 0, "translation": "...", "note": "" } ] }`;
 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -537,7 +536,6 @@ Return ONLY valid JSON: { "items": [ { "id": 0, "translation": "...", "note": ""
       }
 
       if (mode === 'ass' && assParsed) {
-        // עדכון קידוד השפה ל-177 (עברית) עבור Aegisub
         const lines = assParsed.rawLines.map(line => {
           if (line.trim().startsWith('Style:')) {
             const parts = line.split(',');
