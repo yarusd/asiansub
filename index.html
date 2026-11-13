@@ -407,7 +407,7 @@ Example: Oppa, did you eat yet? Lee Se Ra is waiting." class="flex-1 w-full resi
       return (str || '').replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>');
     }
 
-    // --- מנוע התרגום מול Gemini AI (מעודכן ל-gemini-3.8-flash) ---
+    // --- מנוע התרגום מול Gemini AI (משתמש במודל gemini-1.5-flash היציב) ---
     async function callGeminiBatch(lines) {
       const glossaryText = glossary.length
         ? `\nMANDATORY GLOSSARY:\n${glossary.map(g => `- "${g.source}" => "${g.target}"`).join('\n')}`
@@ -421,7 +421,7 @@ RULES:
 4. Keep line breaks (\\n) and punctuation accurate.${glossaryText}
 Return ONLY valid JSON: { "items": [ { "id": 0, "translation": "...", "note": "" } ] }`;
 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
