@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AsianSub | סביבת עבודה מקצועית לתרגום כתוביות</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; }
+    textarea::-webkit-scrollbar { width: 8px; }
+    textarea::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+
+  <!-- סרגל עליון -->
+  <header class="border-b border-slate-800 bg-slate-900/95 sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="h-10 w-10 rounded-xl bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400 font-bold text-lg">
+          漢
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-lg font-bold text-white">AsianSub</h1>
+            <span id="modeBadge" class="rounded-full bg-slate-800 px-2.5 py-0.5 text-xs font-medium text-indigo-300 border border-slate-700">
+              מצב: טקסט חופשי
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">תרגום כתוביות לעברית • תמיכה מלאה ב-SRT, ASS ו-Aegisub RTL</p>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <input type="file" id="fileInput" accept=".srt,.ass" class="hidden" />
+        <button onclick="document.getElementById('fileInput').click()" class="rounded-lg border border-slate-700 bg-slate-800 px-3.5 py-2 text-sm font-medium hover:bg-slate-700 transition">
+          📂 העלאת SRT / ASS
+        </button>
+        <button onclick="toggleModal('glossaryModal', true)" class="rounded-lg border border-slate-700 bg-slate-800 px-3.5 py-2 text-sm font-medium hover:bg-slate-700 transition">
+          📖 מילון סדרה (<span id="glossaryCount">0</span>)
+        </button>
+        <button onclick="toggleModal('apiModal', true)" id="apiBtn" class="rounded-lg border border-amber-600/50 bg-amber-950/40 px-3.5 py-2 text-sm font-medium text-amber-300 hover:bg-amber-900/40 transition">
+          🔑 מפתח AI
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- סרגל פעולות -->
+  <div class="border-b border-slate-800 bg-slate-950">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-2">
+        <button id="translateBtn" onclick="startTranslation()" class="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 hover:bg-indigo-500 transition">
+          ✨ תרגם לעברית
+        </button>
+        <button onclick="clearWorkspace()" class="rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-sm text-slate-300 hover:bg-slate-800 transition">
+          🗑️ נקה
+        </button>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="copyBtn" onclick="copyResult()" class="rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2 text-sm text-slate-200 hover:bg-slate-800 transition">
+          📋 העתק
+        </button>
+        <button id="downloadBtn" onclick="downloadResult(false)" class="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 transition">
+          ⬇️ הורד TXT
+        </button>
+        <button id="exportFreeSrtBtn" onclick="downloadResult(true)" class="hidden rounded-xl border border-emerald-700/50 bg-emerald-950/40 px-3 py-2 text-xs font-medium text-emerald-300 hover:bg-emerald-900/40 transition">
+          ייצא כ-SRT
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- הודעות שגיאה / סטטוס -->
+  <div id="alertBox" class="hidden max-w-7xl mx-auto w-full px-4 mt-4">
+    <div id="alertText" class="rounded-xl border border-rose-500/40 bg-rose-950/50 px-4 py-3 text-sm text-rose-200"></div>
+  </div>
+
+  <!-- אזור עבודה מרכזי -->
+  <main class="flex-1 max-w-7xl mx-auto w-full p-4">
+    <!-- תצוגת טקסט חופשי -->
+    <div id="freeTextView" class="grid grid-cols-1 lg:grid-cols-2 gap-4 h-[calc(100vh-220px)] min-h-[450px]">
+      <div class="flex flex-col rounded-2xl border border-slate-800 bg-slate-900/70 overflow-hidden">
+        <div class="flex items-center justify-between border-b border-slate-800 px-4 py-2.5 bg-slate-900">
+          <span class="text-xs font-semibold text-slate-300">מקור באנגלית (English Source)</span>
+          <span class="text-[11px] font-mono text-slate-500">LTR</span>
+        </div>
+        <textarea id="sourceTextarea" dir="ltr" placeholder="Paste English dialogue here...
+Example: Oppa, did you eat yet? Lee Se Ra is waiting." class="flex-1 w-full resize-none bg-transparent p-4 text-left text-base leading-relaxed text-slate-100 placeholder:text-slate-600 focus:outline-none"></textarea>
+      </div>
+
+      <div class="flex flex-col rounded-2xl border border-slate-800 bg-slate-900/70 overflow-hidden">
+        <div class="flex items-center justify-between border-b border-slate-800 px-4 py-2.5 bg-slate-900">
+          <span class="text-xs font-semibold text-emerald-300">תרגום לעברית (ניתן לעריכה ידנית)</span>
+          <span class="text-[11px] font-mono text-slate-500">RTL</span>
+        </div>
+        <textarea id="targetTextarea" dir="rtl" placeholder="התרגום הטבעי לעברית יופיע כאן..." class="flex-1 w-full resize-none bg-transparent p-4 text-right text-base leading-relaxed text-slate-100 placeholder:text-slate-600 focus:outline-none"></textarea>
+        <div id="freeTextNote" class="hidden border-t border-amber-500/30 bg-amber-950/30 px-4 py-2.5 text-xs text-amber-200"></div>
+      </div>
+    </div>
+
+    <!-- תצוגת עורך כתוביות SRT / ASS -->
+    <div id="subtitleEditorView" class="hidden space-y-3"></div>
+  </main>
+
+  <!-- חלונית מפתח API -->
+  <div id="apiModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4">
+    <div class="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl space-y-4">
+      <h2 class="text-lg font-bold">הגדרת מפתח Gemini AI (חינם)</h2>
+      <p class="text-xs text-slate-400 leading-relaxed">
+        המפתח נשמר אך ורק בדפדפן שלך (LocalStorage) ומשמש לתרגום ישיר מול Google Gemini.
+        ניתן להפיק מפתח חינם ב-Google AI Studio.
+      </p>
+      <input type="password" id="apiKeyInput" dir="ltr" placeholder="AIzaSy..." class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-left focus:border-indigo-500 focus:outline-none" />
+      <div class="flex justify-end gap-2">
+        <button onclick="toggleModal('apiModal', false)" class="rounded-lg px-4 py-2 text-sm text-slate-400 hover:bg-slate-800">ביטול</button>
+        <button onclick="saveApiKey()" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500">שמור מפתח</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- חלונית מילון סדרה -->
+  <div id="glossaryModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4">
+    <div class="w-full max-w-xl rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <h2 class="text-lg font-bold">מילון סדרה ותעתיק שמות (אופציונלי)</h2>
+        <button onclick="toggleModal('glossaryModal', false)" class="text-slate-400 hover:text-white">✕</button>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <input type="text" id="gSource" dir="ltr" placeholder="אנגלית (Kim Ji Young)" class="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-left" />
+        <input type="text" id="gTarget" placeholder="עברית (קים ג'י יונג)" class="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm" />
+        <button onclick="addGlossaryItem()" class="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500">+ הוסף</button>
+      </div>
+      <div id="glossaryList" class="max-h-56 overflow-y-auto space-y-2 text-sm"></div>
+    </div>
+  </div>
+
+  <script>
+    // --- ניהול מצב (State) ---
+    let mode = 'free-text'; // 'free-text' | 'srt' | 'ass'
+    let currentFileName = '';
+    let srtEntries = [];
+    let assParsed = null;
+    let glossary = JSON.parse(localStorage.getItem('asiansub_glossary') || '[]');
+    let apiKey = localStorage.getItem('asiansub_gemini_key') || '';
+
+    // אתחול תצוגה
+    updateApiBtnStatus();
+    renderGlossary();
+
+    function toggleModal(id, show) {
+      document.getElementById(id).classList.toggle('hidden', !show);
+      if (id === 'apiModal' && show) {
+        document.getElementById('apiKeyInput').value = apiKey;
+      }
+    }
+
+    function saveApiKey() {
+      apiKey = document.getElementById('apiKeyInput').value.trim();
+      localStorage.setItem('asiansub_gemini_key', apiKey);
+      updateApiBtnStatus();
+      toggleModal('apiModal', false);
+      showAlert('');
+    }
+
+    function updateApiBtnStatus() {
+      const btn = document.getElementById('apiBtn');
+      if (apiKey) {
+        btn.className = 'rounded-lg border border-emerald-600/50 bg-emerald-950/40 px-3.5 py-2 text-sm font-medium text-emerald-300 hover:bg-emerald-900/40 transition';
+        btn.innerText = '🔑 מפתח AI פעיל';
+      } else {
+        btn.className = 'rounded-lg border border-amber-600/50 bg-amber-950/40 px-3.5 py-2 text-sm font-medium text-amber-300 hover:bg-amber-900/40 transition';
+        btn.innerText = '🔑 הגדר מפתח AI';
+      }
+    }
+
+    function showAlert(msg) {
+      const box = document.getElementById('alertBox');
+      const text = document.getElementById('alertText');
+      if (!msg) {
+        box.classList.add('hidden');
+      } else {
+        text.innerText = msg;
+        box.classList.remove('hidden');
+      }
+    }
+
+    // --- מילון סדרה ---
+    function addGlossaryItem() {
+      const s = document.getElementById('gSource').value.trim();
+      const t = document.getElementById('gTarget').value.trim();
+      if (!s || !t) return;
+      glossary.push({ source: s, target: t });
+      localStorage.setItem('asiansub_glossary', JSON.stringify(glossary));
+      document.getElementById('gSource').value = '';
+      document.getElementById('gTarget').value = '';
+      renderGlossary();
+    }
+
+    function removeGlossaryItem(idx) {
+      glossary.splice(idx, 1);
+      localStorage.setItem('asiansub_glossary', JSON.stringify(glossary));
+      renderGlossary();
+    }
+
+    function renderGlossary() {
+      document.getElementById('glossaryCount').innerText = glossary.length;
+      const list = document.getElementById('glossaryList');
+      if (glossary.length === 0) {
+        list.innerHTML = '<p class="text-center text-xs text-slate-500 py-4">אין מונחים שמורים. כללי התעתיק הקוריאני פעילים אוטומטית.</p>';
+        return;
+      }
+      list.innerHTML = glossary.map((g, i) => `
+        <div class="flex justify-between items-center rounded-lg border border-slate-800 bg-slate-950 px-3 py-2">
+          <div><span dir="ltr" class="font-mono text-indigo-300">${g.source}</span> ← <span class="text-emerald-300 font-medium">${g.target}</span></div>
+          <button onclick="removeGlossaryItem(${i})" class="text-slate-500 hover:text-rose-400">✕</button>
+        </div>
+      `).join('');
+    }
+
+    // --- העלאת קבצים ופרסרים (SRT + ASS) ---
+    document.getElementById('fileInput').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      showAlert('');
+      const ext = file.name.split('.').pop().toLowerCase();
+      try {
+        const text = await file.text();
+        if (!text.trim()) throw new Error('הקובץ שהועלה ריק.');
+        currentFileName = file.name;
+
+        if (ext === 'srt') {
+          srtEntries = parseSrt(text);
+          assParsed = null;
+          setMode('srt');
+          renderSubtitleEditor();
+        } else if (ext === 'ass') {
+          assParsed = parseAss(text);
+          srtEntries = [];
+          setMode('ass');
+          renderSubtitleEditor();
+        } else {
+          throw new Error('יש להעלות קובץ .SRT או .ASS בלבד.');
+        }
+      } catch (err) {
+        showAlert(err.message);
+      }
+      e.target.value = '';
+    });
+
+    function setMode(newMode) {
+      mode = newMode;
+      const badge = document.getElementById('modeBadge');
+      const dlBtn = document.getElementById('downloadBtn');
+      const freeView = document.getElementById('freeTextView');
+      const subView = document.getElementById('subtitleEditorView');
+      const freeSrtBtn = document.getElementById('exportFreeSrtBtn');
+
+      if (mode === 'free-text') {
+        badge.innerText = 'מצב: טקסט חופשי';
+        dlBtn.innerText = '⬇️ הורד TXT';
+        freeView.classList.remove('hidden');
+        subView.classList.add('hidden');
+        freeSrtBtn.classList.remove('hidden');
+      } else if (mode === 'srt') {
+        badge.innerText = `קובץ SRT: ${currentFileName}`;
+        dlBtn.innerText = '⬇️ הורד SRT מתורגם';
+        freeView.classList.add('hidden');
+        subView.classList.remove('hidden');
+        freeSrtBtn.classList.add('hidden');
+      } else if (mode === 'ass') {
+        badge.innerText = `קובץ ASS: ${currentFileName}`;
+        dlBtn.innerText = '⬇️ הורד ASS מתורגם';
+        freeView.classList.add('hidden');
+        subView.classList.remove('hidden');
+        freeSrtBtn.classList.add('hidden');
+      }
+    }
+
+    function parseSrt(content) {
+      const blocks = content.replace(/\r\n/g, '\n').replace(/^\uFEFF/, '').trim().split(/\n{2,}/);
+      const entries = [];
+      for (const b of blocks) {
+        const lines = b.split('\n');
+        if (lines.length < 3) continue;
+        const index = parseInt(lines[0].trim(), 10);
+        const m = lines[1].trim().match(/^(\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2},\d{3})/);
+        if (isNaN(index) || !m) throw new Error(`מבנה SRT לא תקין בשורה: ${lines[0]}`);
+        entries.push({
+          index,
+          start: m[1],
+          end: m[2],
+          source: lines.slice(2).join('\n'),
+          translated: '',
+          isEdited: false,
+          note: ''
+        });
+      }
+      if (!entries.length) throw new Error('לא נמצאו כתוביות תקינות בקובץ.');
+      return entries;
+    }
+
+    function parseAss(content) {
+      const rawLines = content.replace(/\r\n/g, '\n').replace(/^\uFEFF/, '').split('\n');
+      if (!content.includes('[Events]')) throw new Error('קובץ ASS לא תקני (חסר [Events]).');
+      const dialogues = [];
+      let inEvents = false;
+      let textColIndex = 9;
+
+      rawLines.forEach((line, idx) => {
+        const t = line.trim();
+        if (t.startsWith('[') && t.endsWith(']')) {
+          inEvents = t.toLowerCase() === '[events]';
+          return;
+        }
+        if (!inEvents) return;
+        if (t.startsWith('Format:')) {
+          const cols = t.replace('Format:', '').split(',').map(c => c.trim().toLowerCase());
+          if (cols.indexOf('text') > 0) textColIndex = cols.indexOf('text');
+          return;
+        }
+        if (t.startsWith('Dialogue:')) {
+          let commas = 0, splitPos = -1;
+          for (let i = 0; i < line.length; i++) {
+            if (line[i] === ',') {
+              commas++;
+              if (commas === textColIndex) { splitPos = i + 1; break; }
+            }
+          }
+          if (splitPos === -1) return;
+          const prefix = line.slice(0, splitPos);
+          const rawText = line.slice(splitPos);
+          const isDrawing = /\\p[1-9]/.test(rawText);
+          // חילוץ תגיות פתיחה וניקוי תגיות לקבלת טקסט נקי לתרגום
+          const leadingMatch = rawText.match(/^(\{[^}]*\})+/);
+          const leadingTags = leadingMatch ? leadingMatch[0] : '';
+          const plainSource = isDrawing ? '' : rawText.replace(/\{[^}]*\}/g, '').replace(/\\[Nnh]/g, '\n').trim();
+
+          dialogues.push({
+            lineNumber: idx,
+            prefix,
+            rawText,
+            leadingTags,
+            plainSource,
+            translated: '',
+            isDrawing,
+            isEdited: false,
+            note: ''
+          });
+        }
+      });
+      if (!dialogues.length) throw new Error('לא נמצאו שורות Dialogue בקובץ ה-ASS.');
+      return { rawLines, dialogues };
+    }
+
+    // --- תיקון פיסוק אוטומטי ל-Aegisub (RTL Unicode Wrapping + Encoding 177) ---
+    function fixHebrewRtlForAegisub(text, newlineSeparator = '\\N') {
+      const RLE = '\u202B'; // Right-to-Left Embedding
+      const PDF = '\u202C'; // Pop Directional Formatting
+      return text
+        .split(newlineSeparator)
+        .map(line => {
+          const clean = line.trim().replace(/[\u202B\u202C\u200F]/g, '');
+          return clean ? `${RLE}${clean}${PDF}` : line;
+        })
+        .join(newlineSeparator);
+    }
+
+    function renderSubtitleEditor() {
+      const container = document.getElementById('subtitleEditorView');
+      const items = mode === 'srt' ? srtEntries : assParsed.dialogues;
+
+      container.innerHTML = items.map((item, idx) => {
+        const src = mode === 'srt' ? item.source : item.rawText;
+        const disabled = mode === 'ass' && item.isDrawing ? 'disabled' : '';
+        return `
+          <div class="rounded-xl border border-slate-800 bg-slate-900/80 p-4 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+            <div class="lg:col-span-2 text-xs font-mono text-slate-400">
+              <div class="font-bold text-indigo-400">#${mode === 'srt' ? item.index : idx + 1}</div>
+              ${mode === 'srt' ? `<div dir="ltr" class="mt-1">${item.start} → ${item.end}</div>` : ''}
+            </div>
+            <div class="lg:col-span-5">
+              <div dir="ltr" class="rounded-lg border border-slate-800 bg-slate-950 p-3 text-left text-xs font-mono whitespace-pre-wrap text-slate-300 break-words">${escapeHtml(src)}</div>
+            </div>
+            <div class="lg:col-span-5 space-y-1">
+              <textarea dir="rtl" rows="2" ${disabled} oninput="onManualEdit(${idx}, this.value)"
+                placeholder="${disabled ? 'פקודת ציור מוגנת' : 'תרגום לעברית...'}"
+                class="w-full rounded-lg border border-slate-700 bg-slate-950 p-2.5 text-right text-sm text-white focus:border-indigo-500 focus:outline-none">${escapeHtml(item.translated)}</textarea>
+              ${item.note ? `<div class="text-xs text-amber-300">⚠️ ${escapeHtml(item.note)}</div>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function onManualEdit(idx, val) {
+      if (mode === 'srt') {
+        srtEntries[idx].translated = val;
+        srtEntries[idx].isEdited = true;
+      } else if (mode === 'ass') {
+        assParsed.dialogues[idx].translated = val;
+        assParsed.dialogues[idx].isEdited = true;
+      }
+    }
+
+    function escapeHtml(str) {
+      return (str || '').replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>');
+    }
+
+    // --- מנוע התרגום מול Gemini AI ---
+    async function callGeminiBatch(lines) {
+      const glossaryText = glossary.length
+        ? `\nMANDATORY GLOSSARY:\n${glossary.map(g => `- "${g.source}" => "${g.target}"`).join('\n')}`
+        : '';
+
+      const systemPrompt = `You are AsianSub, an expert subtitle translator for Asian dramas (Korean, Chinese, Japanese) into natural, fluent Hebrew.
+RULES:
+1. Preserve ambiguity! Never guess gender or singular/plural if unclear. Use gender-neutral Hebrew or provide a short note in "note".
+2. Korean Names: Family name FIRST, NO hyphens in given name (e.g. "Kim Ji Young" -> "קים ג'י יונג", "Lee Se Ra" -> "יי סרה").
+3. Translate Asian terms (Oppa, Hyung, Unnie, Noona, Sunbae, Aish, Daebak, Fighting) contextually into natural Hebrew.
+4. Keep line breaks (\\n) and punctuation accurate.${glossaryText}
+Return ONLY valid JSON: { "items": [ { "id": 0, "translation": "...", "note": "" } ] }`;
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          contents: [{ parts: [{ text: `Translate sequentially with context:\n${JSON.stringify(lines)}` }] }],
+          generationConfig: {
+            temperature: 0.25,
+            responseMimeType: 'application/json'
+          }
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error?.message || 'שגיאת API מול Gemini');
+      const rawJson = data.candidates[0].content.parts[0].text;
+      return JSON.parse(rawJson).items;
+    }
+
+    async function startTranslation() {
+      showAlert('');
+      if (!apiKey) {
+        toggleModal('apiModal', true);
+        return;
+      }
+
+      const btn = document.getElementById('translateBtn');
+      btn.disabled = true;
+      btn.innerText = '⏳ מתרגם...';
+
+      try {
+        if (mode === 'free-text') {
+          const src = document.getElementById('sourceTextarea').value;
+          if (!src.trim()) throw new Error('יש להדביק טקסט באנגלית לתרגום.');
+          const lines = src.split('\n').map((text, id) => ({ id, text }));
+          const results = await callGeminiBatch(lines);
+          const out = lines.map((l, idx) => {
+            if (!l.text.trim()) return '';
+            const found = results.find(r => r.id === idx);
+            return found ? found.translation : l.text;
+          }).join('\n');
+          document.getElementById('targetTextarea').value = out;
+
+          const notes = results.filter(r => r.note).map(r => r.note).join(' | ');
+          const noteBox = document.getElementById('freeTextNote');
+          if (notes) {
+            noteBox.innerText = `⚠️ הערת עמימות: ${notes}`;
+            noteBox.classList.remove('hidden');
+          } else {
+            noteBox.classList.add('hidden');
+          }
+        } else if (mode === 'srt') {
+          const toDo = srtEntries
+            .map((e, id) => ({ id, text: e.source, skip: e.isEdited || !e.source.trim() }))
+            .filter(x => !x.skip);
+
+          for (let i = 0; i < toDo.length; i += 40) {
+            const chunk = toDo.slice(i, i + 40);
+            btn.innerText = `⏳ מתרגם (${Math.round((i / toDo.length) * 100)}%)...`;
+            const results = await callGeminiBatch(chunk.map(({ id, text }) => ({ id, text })));
+            for (const r of results) {
+              if (srtEntries[r.id] && !srtEntries[r.id].isEdited) {
+                srtEntries[r.id].translated = r.translation;
+                srtEntries[r.id].note = r.note || '';
+              }
+            }
+            renderSubtitleEditor();
+          }
+        } else if (mode === 'ass' && assParsed) {
+          const toDo = assParsed.dialogues
+            .map((d, id) => ({ id, text: d.plainSource, skip: d.isEdited || d.isDrawing || !d.plainSource.trim() }))
+            .filter(x => !x.skip);
+
+          for (let i = 0; i < toDo.length; i += 40) {
+            const chunk = toDo.slice(i, i + 40);
+            btn.innerText = `⏳ מתרגם (${Math.round((i / toDo.length) * 100)}%)...`;
+            const results = await callGeminiBatch(chunk.map(({ id, text }) => ({ id, text })));
+            for (const r of results) {
+              const d = assParsed.dialogues[r.id];
+              if (d && !d.isEdited) {
+                d.translated = r.translation;
+                d.note = r.note || '';
+              }
+            }
+            renderSubtitleEditor();
+          }
+        }
+      } catch (err) {
+        showAlert(err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = '✨ תרגם לעברית';
+      }
+    }
+
+    // --- ייצוא והורדה (כולל תיקון הפיסוק האוטומטי ל-Aegisub!) ---
+    function buildExportContent(asSrtFromFree = false) {
+      if (mode === 'free-text') {
+        const val = document.getElementById('targetTextarea').value;
+        if (!asSrtFromFree) return '\uFEFF' + val;
+        return '\uFEFF' + val.split('\n').filter(l => l.trim()).map((l, i) =>
+          `${i + 1}\n00:00:${String(i * 3).padStart(2, '0')},000 --> 00:00:${String(i * 3 + 2).padStart(2, '0')},500\n${fixHebrewRtlForAegisub(l, '\n')}`
+        ).join('\n\n');
+      }
+
+      if (mode === 'srt') {
+        const body = srtEntries.map(e => {
+          const raw = e.translated.trim() || e.source;
+          return `${e.index}\n${e.start} --> ${e.end}\n${fixHebrewRtlForAegisub(raw, '\n')}`;
+        }).join('\n\n');
+        return '\uFEFF' + body + '\n';
+      }
+
+      if (mode === 'ass' && assParsed) {
+        // עדכון קידוד השפה ל-177 (עברית) עבור Aegisub
+        const lines = assParsed.rawLines.map(line => {
+          if (line.trim().startsWith('Style:')) {
+            const parts = line.split(',');
+            if (parts.length >= 23) {
+              parts[parts.length - 1] = '177';
+              return parts.join(',');
+            }
+          }
+          return line;
+        });
+
+        for (const d of assParsed.dialogues) {
+          if (d.isDrawing || !d.translated.trim()) {
+            lines[d.lineNumber] = `${d.prefix}${d.rawText}`;
+          } else {
+            const assNewlines = d.translated.replace(/\n/g, '\\N');
+            const rtlFixed = fixHebrewRtlForAegisub(assNewlines, '\\N');
+            lines[d.lineNumber] = `${d.prefix}${d.leadingTags}${rtlFixed}`;
+          }
+        }
+        return '\uFEFF' + lines.join('\n');
+      }
+      return '';
+    }
+
+    async function copyResult() {
+      const content = buildExportContent(false);
+      if (!content.trim()) return;
+      await navigator.clipboard.writeText(content);
+      const btn = document.getElementById('copyBtn');
+      btn.innerText = '✅ הועתק!';
+      setTimeout(() => btn.innerText = '📋 העתק', 2000);
+    }
+
+    function downloadResult(asSrtFromFree) {
+      const content = buildExportContent(asSrtFromFree);
+      if (!content.trim()) return;
+      let name = 'asiansub_translation.txt';
+      if (mode === 'free-text' && asSrtFromFree) name = 'asiansub_translation.srt';
+      else if (mode === 'srt') name = currentFileName.replace(/\.srt$/i, '_HE.srt');
+      else if (mode === 'ass') name = currentFileName.replace(/\.ass$/i, '_HE.ass');
+
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function clearWorkspace() {
+      document.getElementById('sourceTextarea').value = '';
+      document.getElementById('targetTextarea').value = '';
+      document.getElementById('freeTextNote').classList.add('hidden');
+      srtEntries = [];
+      assParsed = null;
+      currentFileName = '';
+      showAlert('');
+      setMode('free-text');
+    }
+  </script>
+</body>
+</html>
