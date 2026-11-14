@@ -407,7 +407,7 @@ Example: Oppa, did you eat yet? Lee Se Ra is waiting." class="flex-1 w-full resi
       return (str || '').replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>');
     }
 
-    // --- מנוע התרגום מול Gemini AI (משתמש במודל gemini-1.5-flash היציב) ---
+    // --- מנוע התרגום מול Gemini AI (מעודכן לגרסת המודל החדשה) ---
     async function callGeminiBatch(lines) {
       const glossaryText = glossary.length
         ? `\nMANDATORY GLOSSARY:\n${glossary.map(g => `- "${g.source}" => "${g.target}"`).join('\n')}`
@@ -421,7 +421,7 @@ RULES:
 4. Keep line breaks (\\n) and punctuation accurate.${glossaryText}
 Return ONLY valid JSON: { "items": [ { "id": 0, "translation": "...", "note": "" } ] }`;
 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -441,6 +441,7 @@ Return ONLY valid JSON: { "items": [ { "id": 0, "translation": "...", "note": ""
       return JSON.parse(rawJson).items;
     }
 
+    // --- פונקציית תרגום ראשית עם חלוקה לחבילות קטנות (15) והשהיה למניעת 503 ---
     async function startTranslation() {
       showAlert('');
       if (!apiKey) {
@@ -478,9 +479,11 @@ Return ONLY valid JSON: { "items": [ { "id": 0, "translation": "...", "note": ""
             .map((e, id) => ({ id, text: e.source, skip: e.isEdited || !e.source.trim() }))
             .filter(x => !x.skip);
 
-          for (let i = 0; i < toDo.length; i += 40) {
-            const chunk = toDo.slice(i, i + 40);
+          const CHUNK_SIZE = 15;
+          for (let i = 0; i < toDo.length; i += CHUNK_SIZE) {
+            const chunk = toDo.slice(i, i + CHUNK_SIZE);
             btn.innerText = `⏳ מתרגם (${Math.round((i / toDo.length) * 100)}%)...`;
+            
             const results = await callGeminiBatch(chunk.map(({ id, text }) => ({ id, text })));
             for (const r of results) {
               if (srtEntries[r.id] && !srtEntries[r.id].isEdited) {
@@ -489,15 +492,21 @@ Return ONLY valid JSON: { "items": [ { "id": 0, "translation": "...", "note": ""
               }
             }
             renderSubtitleEditor();
+
+            if (i + CHUNK_SIZE < toDo.length) {
+              await new Promise(resolve => setTimeout(resolve, 1500));
+            }
           }
         } else if (mode === 'ass' && assParsed) {
           const toDo = assParsed.dialogues
             .map((d, id) => ({ id, text: d.plainSource, skip: d.isEdited || d.isDrawing || !d.plainSource.trim() }))
             .filter(x => !x.skip);
 
-          for (let i = 0; i < toDo.length; i += 40) {
-            const chunk = toDo.slice(i, i + 40);
+          const CHUNK_SIZE = 15;
+          for (let i = 0; i < toDo.length; i += CHUNK_SIZE) {
+            const chunk = toDo.slice(i, i + CHUNK_SIZE);
             btn.innerText = `⏳ מתרגם (${Math.round((i / toDo.length) * 100)}%)...`;
+            
             const results = await callGeminiBatch(chunk.map(({ id, text }) => ({ id, text })));
             for (const r of results) {
               const d = assParsed.dialogues[r.id];
@@ -507,6 +516,10 @@ Return ONLY valid JSON: { "items": [ { "id": 0, "translation": "...", "note": ""
               }
             }
             renderSubtitleEditor();
+
+            if (i + CHUNK_SIZE < toDo.length) {
+              await new Promise(resolve => setTimeout(resolve, 1500));
+            }
           }
         }
       } catch (err) {
